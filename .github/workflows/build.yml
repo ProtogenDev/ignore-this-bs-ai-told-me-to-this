@@ -1,0 +1,40 @@
+name: Build Custom WSL2 Kernel
+
+on:
+  workflow_dispatch: # Allows you to manually trigger the build via a button
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential flex bison libssl-dev libelf-dev bc libncurses-dev kmod
+
+    - name: Apply custom configurations
+      run: |
+        # Turn on casefolding (Unicode) and essential filesystems in the default WSL config
+        sed -i 's/# CONFIG_UNICODE is not set/CONFIG_UNICODE=y/' Microsoft/config-wsl
+        echo "CONFIG_BTRFS_FS=y" >> Microsoft/config-wsl
+        echo "CONFIG_XFS_FS=y" >> Microsoft/config-wsl
+        echo "CONFIG_F2FS_FS=y" >> Microsoft/config-wsl
+        echo "CONFIG_FS_ENCRYPTION=y" >> Microsoft/config-wsl
+
+    - name: Prepare build configuration
+      run: |
+        make KCONFIG_CONFIG=Microsoft/config-wsl olddefconfig
+
+    - name: Compile kernel
+      run: |
+        make KCONFIG_CONFIG=Microsoft/config-wsl -j$(nproc) bzImage
+
+    - name: Upload Kernel Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: custom-wsl-kernel
+        path: arch/x86/boot/bzImage
